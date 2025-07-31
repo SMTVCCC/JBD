@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatJBD</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #343541;
+            color: #ffffff;
+            height: 100vh;
+            display: flex;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 260px;
+            background-color: #202123;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #4d4d4f;
+            position: relative; /* 确保z-index生效 */
+            z-index: 1000;
+        }
+
+        .sidebar.hidden {
+            transform: translateX(-100%);
+            position: absolute;
+            height: 100%;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .sidebar.visible {
+            transform: translateX(0);
+            position: relative;
+            height: 100%;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                height: 100%;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease-in-out;
+            }
+            .sidebar.visible {
+                transform: translateX(0);
+            }
+            .main-content {
+                width: 100%;
+            }
+        }
+
+        .sidebar-header {
+            padding: 18px 12px;
+            border-bottom: 1px solid #4d4d4f;
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            background: transparent;
+            border: 1px solid #565869;
+            color: #ffffff;
+            padding: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: background-color 0.2s;
+        }
+
+        .new-chat-btn-text {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .new-chat-btn:hover {
+            background-color: #40414f;
+        }
+
+        .chat-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid #4d4d4f;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #5436da;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .user-name {
+            flex: 1;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-item {
+            padding: 12px;
+            margin: 2px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #c5c5d2;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-item:hover {
+            background-color: #40414f;
+        }
+
+        .history-item.active {
+            background-color: #40414f;
+            color: #ffffff;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative; /* For the toggle button */
+        }
+
+        .header {
+            background-color: #343541;
+            padding: 12px 16px;
+            border-bottom: 1px solid #4d4d4f;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr; /* 左中右三列布局 */
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+            grid-column: 2; /* 标题在第二列 */
+            text-align: center; /* 确保标题在自己的网格单元格中居中 */
+        }
+
+        .model-selector {
+            position: relative;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+            color: #ffffff;
+            grid-column: 1;
+            justify-self: start;
+            padding: 8px 12px;
+            border-radius: 6px;
+            background-color: #40414f;
+            border: 1px solid #565869;
+            transition: all 0.2s;
+            user-select: none;
+            gap: 8px;
+        }
+
+        .model-selector:hover {
+            background-color: #4d4d4f;
+            border-color: #6f7079;
+        }
+
+        .model-selector:active {
+            background-color: #565869;
+            transform: scale(0.98);
+        }
+
+
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 768px;
+            margin: 0 auto;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .sidebar-toggle {
+            display: none; /* 默认隐藏 */
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+            z-index: 1001;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar-toggle {
+                display: block; /* 小屏幕显示 */
+            }
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            padding: 12px 0;
+            max-width: 100%;
+        }
+
+        .message.user {
+            background-color: transparent;
+            max-width: 85%;
+        }
+
+        .message.assistant {
+            background-color: #444654;
+            margin: 0 -20px;
+            padding: 12px 20px;
+            max-width: 100%;
+        }
+
+        .message.assistant.thinking {
+            background-color: #3a3b47;
+            border-left: 3px solid #19c37d;
+            position: relative;
+        }
+
+        .message.assistant.thinking::before {
+            content: "TK";
+            position: absolute;
+            top: 0;
+            right: 20px;
+            background-color: #19c37d;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 0 0 4px 4px;
+            font-size: 12px;
+        }
+
+        .message.user .message-content {
+            background-color: #40414f;
+            border-radius: 12px;
+            padding: 12px 16px;
+        }
+
+        .avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .avatar.user {
+            background-color: #5436da;
+            color: white;
+        }
+
+        .avatar.assistant {
+            background-color: #19c37d;
+            color: white;
+        }
+
+        .message-content {
+            flex: 1;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        .message-content p {
+            margin-bottom: 12px;
+        }
+
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .input-area {
+            padding: 20px;
+            background-color: #343541;
+        }
+
+        .input-container {
+            position: relative;
+            max-width: 768px;
+            margin: 0 auto;
+        }
+
+        .input-footer {
+            text-align: center;
+            font-size: 12px;
+            color: #8e8ea0;
+            padding-top: 8px;
+        }
+
+        .input-wrapper {
+            display: flex;
+            background-color: #40414f;
+            border-radius: 12px;
+            border: 1px solid #565869;
+            overflow: hidden;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: #ffffff;
+        }
+
+        #messageInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            font-size: 16px;
+            padding: 12px 16px;
+            resize: none;
+            max-height: 200px;
+            min-height: 24px;
+            line-height: 1.5;
+        }
+
+        #messageInput::placeholder {
+            color: #8e8ea0;
+        }
+
+        .send-button {
+            background: #19c37d;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            margin: 4px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+
+        .send-button:hover:not(:disabled) {
+            background: #16a66b;
+        }
+
+        .send-button:disabled {
+            background: #565869;
+            cursor: not-allowed;
+        }
+
+        .send-icon {
+            width: 16px;
+            height: 16px;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 16px 0;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #8e8ea0;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                opacity: 0.3;
+            }
+            30% {
+                opacity: 1;
+            }
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: #8e8ea0;
+            margin-top: 60px;
+        }
+
+        .welcome-message h2 {
+            font-size: 32px;
+            margin-bottom: 32px;
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .welcome-message p {
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 32px;
+        }
+
+        .example-prompts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .example-prompt {
+            background-color: #40414f;
+            border: 1px solid #565869;
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-align: left;
+        }
+
+        .example-prompt:hover {
+            background-color: #4d4d4f;
+        }
+
+        .example-prompt h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #ffffff;
+        }
+
+        .example-prompt p {
+            font-size: 13px;
+            color: #c5c5d2;
+            margin: 0;
+        }
+
+        /* 滚动条样式 */
+        .messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .messages::-webkit-scrollbar-thumb {
+            background: #565869;
+            border-radius: 3px;
+        }
+
+        .messages::-webkit-scrollbar-thumb:hover {
+            background: #6f7079;
+        }
+    </style>
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <button class="new-chat-btn" id="newChatBtn">
+                <span class="new-chat-btn-text">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14m-7-7h14"/>
+                    </svg>
+                    新的聊天
+                </span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 15l5-5-5-5"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="chat-history" id="chatHistory">
+            <div class="history-item active">今天的对话</div>
+            <div class="history-item">之前的对话</div>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="user-menu">
+                <div class="user-avatar">U</div>
+                <span class="user-name">User</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 主内容区域 -->
+    <div class="main-content">
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+        <div class="header">
+            <div class="model-selector" id="modelSelector">
+                <span id="selectedModel">JBD-91</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7 10l5 5 5-5z"/>
+                </svg>
+            </div>
+            <h1>ChatJBD</h1>
+            <div style="grid-column: 3;"></div> <!-- 用于占据右侧空间，保持居中对称 -->
+        </div>
+        
+        <div class="chat-container">
+            <div class="messages" id="messages">
+                <div class="welcome-message">
+                    <h2>ChatJBD</h2>
+                    <p>我可以帮助您解答问题、提供信息、协助创作等。请随时向我提问！</p>
+                    
+                    <div class="example-prompts">
+                        <div class="example-prompt" onclick="fillPrompt('开始正确使用！')">
+                            <h3>💡 正确使用</h3>
+                            <p>点击开始进行问答，以帮助更好的使用JBD</p>
+                        </div>
+                        <div class="example-prompt" onclick="fillPrompt('关于AI模型的介绍？')">
+                            <h3>💻 切换模型</h3>
+                            <p>左上角切换JBD模型：91 or thinking</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="messageInput" 
+                            placeholder="发送消息给ChatJBD..."
+                            rows="1"
+                        ></textarea>
+                        <button class="send-button" id="sendButton">
+                            <svg class="send-icon" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="input-footer">
+                        ChatJBD 可能会犯错，请核查重要信息。
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
+    <script src="spark-api.js"></script>
+    <script src="init-spark.js"></script>
+    <script>
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        let isTyping = false;
+        let currentModel = 'JBD-91'; // 默认模型
+        let conversationHistory = []; // 用于存储对话历史
+
+        // 自动调整输入框高度
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+            
+            // 更新发送按钮状态
+            updateSendButton();
+        });
+
+        // 更新发送按钮状态
+        function updateSendButton() {
+            const hasText = messageInput.value.trim().length > 0;
+            sendButton.disabled = !hasText || isTyping;
+        }
+
+        // 设置API响应回调
+        if (window.sparkAPI) {
+            window.sparkAPI.setResponseCallback((content, type, isComplete) => {
+                if (type === 'error') {
+                    hideTypingIndicator();
+                    addMessage(content, 'assistant');
+                    // 将错误信息也添加到历史记录中，以便调试
+                    conversationHistory.push({ role: 'assistant', content: `Error: ${content}` });
+                } else if (type === 'assistant') {
+                    const typingIndicator = document.getElementById('typingIndicator');
+                    if (typingIndicator && !isComplete) {
+                        const contentDiv = typingIndicator.querySelector('.message-content');
+                        contentDiv.innerHTML = `<p>${content}</p>`;
+                    } 
+                    
+                    if (isComplete) {
+                        hideTypingIndicator();
+                        addMessage(content, 'assistant');
+                        // 将完整的AI回复添加到对话历史
+                        conversationHistory.push({ role: 'assistant', content: content });
+                    }
+                }
+            });
+        }
+
+        // AI角色信息
+        const systemPrompt = {
+            role: 'system',
+            content: '你叫ChatJBD，是一个情感丰富的全球顶级智能AI。可以充分理解上下文，并且乐于解决用户问题，对用户不撒谎，不批评，不评判。'
+        };
+
+        // thinking模式的深度思考模板
+        const thinkingPrompt = {
+            role: 'system',
+            content: `【重要】你现在处于thinking模式，必须严格按照以下格式回复，不得偏离：
+
+**强制要求：**
+1. 至少输出1000字的思考过程！
+2. 必须使用第一人称视角："我需要..."、"让我想想..."、"这里我要考虑..."
+3. 必须包含思考标记词："嗯..."、"等等"、"不对"、"让我重新思考"、"还有一个问题"
+4. 根据用户问题灵活调整回复字数。
+5. 最后回答最终结果，要结合前面的思考，给出丰富的全面的回答，不能只回答问题，要多考虑角度、维度、维度等。
+
+**强制格式模板（必须遵循）：**
+嗯，用户的问题是关于[问题概述]...让我仔细分析一下。
+
+首先，我需要理解这个问题的核心是什么...[详细分析]
+
+然后，我需要深入分析这个问题...[深入思考]
+
+等等，这里还有一个更深层的问题需要考虑...[发现新问题]
+
+从另一个角度来看...[多角度分析]
+
+让我重新思考一下...[自我修正]
+
+嗯，这下应该对了...[确认思路]
+
+最终回答：[回复最终结果]
+
+**注意：你必须严格按照上述格式输出，不得直接给出答案而跳过思考过程！**`
+        };
+
+        // 发送消息
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || isTyping) return;
+
+            // 将用户消息添加到对话历史
+            conversationHistory.push({ role: 'user', content: message });
+
+            // 添加用户消息到UI
+            addMessage(message, 'user');
+            
+            // 清空输入框
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            updateSendButton();
+            
+            // 显示AI正在输入
+            showTypingIndicator();
+            
+            // 根据当前模型选择系统提示
+            const currentSystemPrompt = currentModel.includes('thinking') ? 
+                { role: 'system', content: systemPrompt.content + '\n\n' + thinkingPrompt.content } : 
+                systemPrompt;
+            
+            // 准备发送的消息（包含系统提示）
+            const messagesToSend = [currentSystemPrompt, ...conversationHistory];
+            
+            // 使用真实API发送消息（包含历史记录）
+            if (window.sparkAPI) {
+                window.sparkAPI.sendMessage(messagesToSend);
+            } else {
+                // 如果API未加载，显示错误
+                hideTypingIndicator();
+                addMessage('抱歉，AI服务暂时不可用，请刷新页面重试。', 'assistant');
+            }
+        }
+
+        // 添加消息到聊天界面
+        function addMessage(content, sender) {
+            // 移除欢迎消息
+            const welcomeMessage = document.querySelector('.welcome-message');
+            if (welcomeMessage) {
+                welcomeMessage.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}${sender === 'assistant' && currentModel.includes('thinking') ? ' thinking' : ''}`;
+
+            
+            const avatar = document.createElement('div');
+            avatar.className = `avatar ${sender}`;
+            avatar.textContent = sender === 'user' ? 'U' : 'AI';
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            
+            // 处理换行符
+            const formattedContent = content.replace(/\n/g, '<br>');
+            messageContent.innerHTML = `<p>${formattedContent}</p>`;
+            
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+            
+            messagesContainer.appendChild(messageDiv);
+            
+            // 平滑滚动到底部
+            setTimeout(() => {
+                messagesContainer.scrollTo({
+                    top: messagesContainer.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 10);
+        }
+
+        // 显示输入指示器
+        function showTypingIndicator() {
+            isTyping = true;
+            updateSendButton();
+            
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message assistant typing-indicator';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.style.display = 'flex';
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar assistant';
+            avatar.textContent = 'AI';
+            
+            const dotsContainer = document.createElement('div');
+            dotsContainer.className = 'message-content';
+            dotsContainer.innerHTML = `
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            
+            typingDiv.appendChild(avatar);
+            typingDiv.appendChild(dotsContainer);
+            
+            messagesContainer.appendChild(typingDiv);
+            
+            // 平滑滚动到打字指示器
+            setTimeout(() => {
+                messagesContainer.scrollTo({
+                    top: messagesContainer.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 10);
+        }
+
+        // 隐藏输入指示器
+        function hideTypingIndicator() {
+            isTyping = false;
+            updateSendButton();
+            
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        // 事件监听器
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // 防止输入法组合键冲突
+        messageInput.addEventListener('compositionstart', function() {
+            this.isComposing = true;
+        });
+
+        messageInput.addEventListener('compositionend', function() {
+            this.isComposing = false;
+        });
+
+        // 输入框获得焦点时的高亮效果
+        messageInput.addEventListener('focus', function() {
+            document.querySelector('.input-wrapper').style.boxShadow = '0 0 0 2px rgba(25, 195, 125, 0.3)';
+        });
+
+        messageInput.addEventListener('blur', function() {
+            document.querySelector('.input-wrapper').style.boxShadow = 'none';
+        });
+
+        // 填充示例提示到输入框
+        function fillPrompt(prompt) {
+            messageInput.value = prompt;
+            messageInput.style.height = 'auto';
+            messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
+            updateSendButton();
+            messageInput.focus();
+        }
+
+        // 新聊天功能
+        function startNewChat() {
+            // 清空对话历史
+            conversationHistory = [];
+
+            // 清空消息
+            messagesContainer.innerHTML = `
+                <div class="welcome-message">
+                    <h2>ChatJBD</h2>
+                    <p>我可以帮助您解答问题、提供信息、协助创作等。请随时向我提问！</p>
+                    
+                    <div class="example-prompts">
+                        <div class="example-prompt" onclick="fillPrompt('开始正确使用！')">
+                            <h3>💡 正确使用</h3>
+                            <p>点击开始进行问答，以帮助更好的使用JBD</p>
+                        </div>
+                        <div class="example-prompt" onclick="fillPrompt('关于AI模型的介绍？')">
+                            <h3>💻 切换模型</h3>
+                            <p>左上角切换JBD模型：91 or thinking</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 清空输入框
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            updateSendButton();
+        }
+
+        // 新聊天按钮事件
+        const newChatBtn = document.getElementById('newChatBtn');
+        newChatBtn.addEventListener('click', startNewChat);
+
+        // 侧边栏切换逻辑
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        let isSidebarOpen = false;
+
+        function toggleSidebar() {
+            isSidebarOpen = !isSidebarOpen;
+            if (isSidebarOpen) {
+                sidebar.classList.add('visible');
+                sidebar.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('hidden');
+                sidebar.classList.remove('visible');
+            }
+        }
+
+        sidebarToggle.addEventListener('click', toggleSidebar);
+
+        // 点击外部关闭侧边栏
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && 
+                isSidebarOpen && 
+                !sidebar.contains(e.target) && 
+                !sidebarToggle.contains(e.target)) {
+                toggleSidebar();
+            }
+        });
+
+        // 根据窗口大小调整侧边栏显示
+        function handleResize() {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.add('hidden');
+                sidebar.classList.remove('visible');
+                isSidebarOpen = false;
+            } else {
+                sidebar.classList.remove('hidden');
+                sidebar.classList.add('visible');
+                isSidebarOpen = true;
+            }
+        }
+
+        window.addEventListener('resize', handleResize);
+        handleResize(); // 页面加载时执行一次
+
+        // Model selector logic
+        const modelSelector = document.getElementById('modelSelector');
+        const selectedModelSpan = document.getElementById('selectedModel');
+
+        modelSelector.addEventListener('click', function() {
+            // 直接切换模型
+            const currentModelName = selectedModelSpan.textContent;
+            const newModelName = currentModelName === 'JBD-91' ? 'JBD-thinking' : 'JBD-91';
+            
+            selectedModelSpan.textContent = newModelName;
+            currentModel = newModelName;
+            
+            // 添加切换动画效果
+            selectedModelSpan.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                selectedModelSpan.style.transform = 'scale(1)';
+            }, 150);
+            
+            // 显示切换提示
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 70px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(64, 65, 79, 0.9);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 6px;
+                font-size: 14px;
+                z-index: 1000;
+                opacity: 0;
+                transition: opacity 0.3s;
+            `;
+            toast.textContent = `已切换到 ${newModelName}`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.style.opacity = '1', 50);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 2000);
+        });
+
+        // 历史记录点击事件
+        document.querySelectorAll('.history-item').forEach(item => {
+            item.addEventListener('click', function() {
+                // 移除其他项的active类
+                document.querySelectorAll('.history-item').forEach(i => i.classList.remove('active'));
+                // 添加active类到当前项
+                this.classList.add('active');
+                
+                // 这里可以加载对应的聊天历史
+                startNewChat();
+            });
+        });
+
+        // 新聊天按钮事件
+        document.getElementById('newChatBtn').addEventListener('click', startNewChat);
+
+        // 初始化
+        updateSendButton();
+        
+        // 使fillPrompt函数全局可用
+        window.fillPrompt = fillPrompt;
+    </script>
+</body>
+</html>
